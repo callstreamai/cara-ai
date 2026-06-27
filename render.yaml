@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cara-ai
+    runtime: node
+    plan: starter
+    region: ohio
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: SAKANA_API_KEY
+        sync: false
+      - key: SAKANA_MODEL
+        value: fugu
+      - key: NODE_VERSION
+        value: 20.11.1
