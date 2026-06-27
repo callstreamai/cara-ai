@@ -44,7 +44,13 @@
   let streaming = false;
   let authMode = "signin";
 
+  // ---------------- Boot ----------------
   async function boot() {
+    // Guard: if the Supabase library failed to load from the CDN, don't hang.
+    if (!window.supabase || typeof window.supabase.createClient !== "function") {
+      return fatal("Couldn't load a required library. Please refresh.");
+    }
+
     let cfg;
     try {
       cfg = await fetch("/api/config").then((r) => r.json());
@@ -54,19 +60,45 @@
     if (!cfg.authEnabled || !cfg.supabaseUrl || !cfg.supabaseAnonKey) {
       return fatal("Sign-in is not configured yet. Please try again shortly.");
     }
-    supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      user = data.session.user;
-      await enterApp();
+    try {
+      supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      });
+    } catch (e) {
+      return fatal("Couldn't start the auth client. Please refresh.");
+    }
+
+    // Never let a stalled getSession() trap the user on the loading screen.
+    let session = null;
+    try {
+      const res = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 6000)),
+      ]);
+      if (!res.__timeout) session = res?.data?.session || null;
+    } catch {
+      session = null;
+    }
+
+    if (session) {
+      user = session.user;
+      try {
+        await enterApp();
+      } catch {
+        showAuth();
+      }
     } else {
       showAuth();
     }
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) { user = session.user; }
-      else { user = null; showAuth(); }
+    supabase.auth.onAuthStateChange((_event, s) => {
+      if (s) {
+        user = s.user;
+      } else {
+        user = null;
+        showAuth();
+      }
     });
   }
 
