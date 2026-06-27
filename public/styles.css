@@ -415,6 +415,172 @@ html, body {
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: var(--line-2); }
 
+/* ---------- Boot ---------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 100;
+}
+.boot-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.boot-msg { color: var(--fg-2); font-size: 14px; max-width: 320px; text-align: center; padding: 0 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Auth screen ---------- */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(900px 500px at 50% -10%, rgba(213, 96, 178, 0.07), transparent 60%),
+    var(--bg);
+  padding: 24px;
+  z-index: 90;
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 36px 32px 30px;
+  text-align: center;
+}
+.auth-mark { width: 40px; height: 40px; margin-bottom: 20px; }
+.auth-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--fg-3);
+  margin-bottom: 12px;
+}
+.auth-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.auth-title .accent { color: var(--pink); }
+.auth-sub { color: var(--fg-2); font-size: 14px; margin-top: 8px; margin-bottom: 26px; }
+
+.auth-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.field input {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.field input:focus { border-color: var(--line-2); }
+.field input::placeholder { color: var(--fg-3); }
+
+.auth-error {
+  background: var(--pink-dim);
+  border: 1px solid var(--pink-line);
+  color: var(--fg);
+  font-size: 12.5px;
+  border-radius: var(--radius);
+  padding: 9px 12px;
+}
+.auth-submit {
+  margin-top: 4px;
+  background: var(--pink);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.auth-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.auth-submit:disabled { opacity: 0.6; cursor: default; }
+
+.auth-switch { margin-top: 20px; font-size: 13px; color: var(--fg-2); }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--pink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+}
+.link-btn:hover { text-decoration: underline; }
+.auth-foot {
+  margin-top: 22px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* ---------- User menu ---------- */
+.user-menu {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--fg-2);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.user-menu:hover { background: var(--bg-2); border-color: var(--line); color: var(--fg); }
+.user-avatar {
+  width: 26px; height: 26px;
+  border-radius: var(--radius);
+  background: var(--pink);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.user-email {
+  flex: 1;
+  text-align: left;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-menu svg { color: var(--fg-3); flex-shrink: 0; }
+
 /* ---------- Responsive ---------- */
 #backdrop {
   display: none;
