@@ -11,6 +11,7 @@
     boot: $("#boot"),
     authScreen: $("#auth-screen"),
     app: $("#app"),
+    // auth
     authForm: $("#auth-form"),
     authEmail: $("#auth-email"),
     authPassword: $("#auth-password"),
@@ -20,6 +21,7 @@
     authSub: $("#auth-sub"),
     authSwitchText: $("#auth-switch-text"),
     authSwitchBtn: $("#auth-switch-btn"),
+    // chat
     list: $("#convo-list"),
     messages: $("#messages"),
     welcome: $("#welcome"),
@@ -34,15 +36,21 @@
     userMenu: $("#user-menu"),
     userEmail: $("#user-email"),
     userAvatar: $("#user-avatar"),
+    attachBtn: $("#attach-btn"),
+    fileInput: $("#file-input"),
+    attachments: $("#attachments"),
   };
+
+  // Attached documents staged for the next message: {id, filename, text, chars, truncated, status}
+  let pendingAttachments = [];
 
   let supabase = null;
   let user = null;
-  let conversations = [];
+  let conversations = [];   // [{id, title, created_at}]
   let activeId = null;
-  let messages = [];
+  let messages = [];        // messages of the active conversation
   let streaming = false;
-  let authMode = "signin";
+  let authMode = "signin";  // or "signup"
 
   // ---------------- Boot ----------------
   async function boot() {
@@ -106,6 +114,7 @@
     els.boot.innerHTML = `<div class="boot-msg">${msg}</div>`;
   }
 
+  // ---------------- Auth UI ----------------
   function showAuth() {
     els.boot.hidden = true;
     els.app.hidden = true;
@@ -132,8 +141,13 @@
     }
   }
 
-  function showAuthError(msg) { els.authError.textContent = msg; els.authError.hidden = false; }
-  function hideAuthError() { els.authError.hidden = true; }
+  function showAuthError(msg) {
+    els.authError.textContent = msg;
+    els.authError.hidden = false;
+  }
+  function hideAuthError() {
+    els.authError.hidden = true;
+  }
 
   els.authSwitchBtn.addEventListener("click", () => setAuthMode(authMode === "signin" ? "signup" : "signin"));
 
@@ -153,6 +167,7 @@
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         if (!data.session) {
+          // Email confirmation required
           showAuthError("Check your email to confirm your account, then sign in.");
           setAuthMode("signin");
           els.authSubmit.disabled = false;
@@ -180,13 +195,16 @@
     return m;
   }
 
+  // ---------------- Enter app ----------------
   async function enterApp() {
     els.boot.hidden = true;
     els.authScreen.hidden = true;
     els.app.hidden = false;
+
     const email = user.email || "Account";
     els.userEmail.textContent = email;
     els.userAvatar.textContent = (email[0] || "U").toUpperCase();
+
     await loadConversations();
     els.input.focus();
   }
@@ -196,15 +214,23 @@
     return data.session?.access_token || "";
   }
 
+  // ---------------- Data: conversations ----------------
   async function loadConversations() {
     const { data, error } = await supabase
       .from("conversations")
       .select("id,title,created_at")
       .order("updated_at", { ascending: false });
-    conversations = error ? [] : (data || []);
+    if (error) {
+      console.error(error);
+      conversations = [];
+    } else {
+      conversations = data || [];
+    }
     if (!conversations.length) {
-      activeId = null; messages = [];
-      renderSidebar(); renderMessages();
+      activeId = null;
+      messages = [];
+      renderSidebar();
+      renderMessages();
     } else {
       activeId = conversations[0].id;
       await openConversation(activeId);
@@ -220,7 +246,9 @@
       .eq("conversation_id", id)
       .order("created_at", { ascending: true });
     messages = error ? [] : (data || []);
-    renderSidebar(); renderMessages(); closeSidebarMobile();
+    renderSidebar();
+    renderMessages();
+    closeSidebarMobile();
   }
 
   async function createConversation(title) {
@@ -229,7 +257,10 @@
       .insert({ user_id: user.id, title: title || "New chat" })
       .select("id,title,created_at")
       .single();
-    if (error) { console.error(error); return null; }
+    if (error) {
+      console.error(error);
+      return null;
+    }
     conversations.unshift(data);
     return data;
   }
@@ -264,6 +295,7 @@
     return data;
   }
 
+  // ---------------- Rendering ----------------
   function renderSidebar() {
     els.list.innerHTML = "";
     conversations.forEach((c) => {
@@ -277,7 +309,10 @@
         </button>`;
       item.querySelector(".title").addEventListener("click", () => openConversation(c.id));
       item.querySelector("svg").addEventListener("click", () => openConversation(c.id));
-      item.querySelector(".del").addEventListener("click", (e) => { e.stopPropagation(); deleteConversation(c.id); });
+      item.querySelector(".del").addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteConversation(c.id);
+      });
       els.list.appendChild(item);
     });
   }
@@ -286,7 +321,10 @@
     const c = conversations.find((x) => x.id === activeId);
     els.title.textContent = c ? c.title : "New chat";
     els.messages.querySelectorAll(".msg-row").forEach((n) => n.remove());
-    if (!messages.length) { els.welcome.style.display = ""; return; }
+    if (!messages.length) {
+      els.welcome.style.display = "";
+      return;
+    }
     els.welcome.style.display = "none";
     messages.forEach((m) => appendMessage(m.role, m.content));
     scrollToBottom();
@@ -311,33 +349,60 @@
     return row.querySelector(".msg-content");
   }
 
-  function renderMarkdown(text) { return window.marked ? marked.parse(text) : escapeHtml(text); }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>\"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;", "'": "&#39;" }[c]));
+  function renderMarkdown(text) {
+    return window.marked ? marked.parse(text) : escapeHtml(text);
   }
-  function scrollToBottom() { els.messages.scrollTop = els.messages.scrollHeight; }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function scrollToBottom() {
+    els.messages.scrollTop = els.messages.scrollHeight;
+  }
 
+  // ---------------- Send ----------------
   async function sendMessage(text) {
-    if (streaming) return;
+    if (streaming || attachmentsBusy()) return;
     text = text.trim();
-    if (!text) return;
+    const docs = readyAttachments();
+    if (!text && docs.length === 0) return;
 
+    // If sending only documents, give the turn a sensible default prompt.
+    const promptText = text || (docs.length === 1
+      ? `Please summarize ${docs[0].filename}.`
+      : "Please summarize the attached documents.");
+
+    // A short marker appended to the stored/displayed message so the
+    // attachment is visible in history (the full text is sent separately).
+    const docNames = docs.map((d) => d.filename);
+    const marker = docNames.length ? `\n\n📎 ${docNames.join(", ")}` : "";
+    const displayText = promptText + marker;
+    const titleSeed = (text || docNames[0] || "New chat");
+
+    // Ensure there's an active conversation.
     let convo = conversations.find((c) => c.id === activeId);
     if (!convo) {
-      convo = await createConversation(text.slice(0, 40) + (text.length > 40 ? "…" : ""));
+      convo = await createConversation(titleSeed.slice(0, 40) + (titleSeed.length > 40 ? "…" : ""));
       if (!convo) return;
-      activeId = convo.id; messages = []; renderSidebar();
+      activeId = convo.id;
+      messages = [];
+      renderSidebar();
     } else if (messages.length === 0 && convo.title === "New chat") {
-      await renameConversation(convo.id, text.slice(0, 40) + (text.length > 40 ? "…" : ""));
+      await renameConversation(convo.id, titleSeed.slice(0, 40) + (titleSeed.length > 40 ? "…" : ""));
       renderSidebar();
     }
 
-    messages.push({ role: "user", content: text });
-    await addMessage(convo.id, "user", text);
+    // Snapshot + clear the staged attachments now (they're consumed by this turn).
+    const sendDocs = docs.map((d) => ({ filename: d.filename, text: d.text }));
+    clearAttachments();
+
+    // Persist + render user message (with the 📎 marker, not the doc text).
+    messages.push({ role: "user", content: displayText });
+    await addMessage(convo.id, "user", displayText);
     els.welcome.style.display = "none";
-    appendMessage("user", text);
+    appendMessage("user", displayText);
     scrollToBottom();
 
+    // Assistant placeholder.
     const contentEl = appendMessage("assistant", "");
     contentEl.innerHTML = `<div class="typing"><span></span><span></span><span></span></div>`;
     scrollToBottom();
@@ -350,16 +415,23 @@
 
     try {
       const token = await accessToken();
+      // Send messages with the last user message as the clean prompt (no 📎 marker);
+      // attachments travel separately and are injected as context server-side.
+      const sendMessages = messages.map((m, i) =>
+        i === messages.length - 1 ? { role: m.role, content: promptText } : m
+      );
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({ messages: sendMessages, attachments: sendDocs }),
       });
 
       if (!resp.ok || !resp.body) {
         const err = await resp.json().catch(() => ({}));
         contentEl.innerHTML = renderMarkdown(`⚠️ ${err.error || "Something went wrong. Please try again."}`);
-        streaming = false; updateSendState(); return;
+        streaming = false;
+        updateSendState();
+        return;
       }
 
       const reader = resp.body.getReader();
@@ -399,32 +471,153 @@
         messages.push({ role: "assistant", content: acc });
         await addMessage(convo.id, "assistant", acc);
         await touchConversation(convo.id);
+        // bump to top of sidebar
         conversations = [convo, ...conversations.filter((c) => c.id !== convo.id)];
         renderSidebar();
       }
     } catch (err) {
       contentEl.innerHTML = renderMarkdown("⚠️ Connection lost. Please try again.");
     } finally {
-      streaming = false; updateSendState(); scrollToBottom();
+      streaming = false;
+      updateSendState();
+      scrollToBottom();
     }
   }
 
-  function updateSendState() { els.send.disabled = streaming || !els.input.value.trim(); }
-  function autoGrow() { els.input.style.height = "auto"; els.input.style.height = Math.min(els.input.scrollHeight, 200) + "px"; }
-  function closeSidebarMobile() { els.sidebar.classList.remove("open"); }
+  // ---------------- Attachments ----------------
+  const MAX_FILE_MB = 15;
+  let attachSeq = 0;
 
-  async function startNewChat() {
-    const current = conversations.find((c) => c.id === activeId);
-    if (current && messages.length === 0) { els.input.focus(); return; }
-    activeId = null; messages = [];
-    renderSidebar(); renderMessages(); closeSidebarMobile(); els.input.focus();
+  function renderAttachments() {
+    els.attachments.innerHTML = "";
+    pendingAttachments.forEach((a) => {
+      const chip = document.createElement("div");
+      chip.className = "attach-chip" + (a.status === "error" ? " error" : "");
+      let icon, meta;
+      if (a.status === "loading") {
+        icon = `<span class="chip-spinner"></span>`;
+        meta = "Reading…";
+      } else if (a.status === "error") {
+        icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>`;
+        meta = a.error || "Failed";
+      } else {
+        icon = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`;
+        meta = a.truncated ? `${(a.chars / 1000).toFixed(0)}k chars · trimmed` : `${a.chars.toLocaleString()} chars`;
+      }
+      chip.innerHTML = `
+        <span class="chip-icon">${icon}</span>
+        <span class="chip-body">
+          <span class="chip-name" title="${escapeHtml(a.filename)}">${escapeHtml(a.filename)}</span>
+          <span class="chip-meta">${escapeHtml(meta)}</span>
+        </span>
+        <button class="chip-remove" aria-label="Remove" data-id="${a.id}">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>`;
+      chip.querySelector(".chip-remove").addEventListener("click", () => {
+        pendingAttachments = pendingAttachments.filter((x) => x.id !== a.id);
+        renderAttachments();
+        updateSendState();
+      });
+      els.attachments.appendChild(chip);
+    });
+    els.attachments.classList.toggle("has-items", pendingAttachments.length > 0);
   }
 
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || []);
+    for (const file of files) {
+      if (pendingAttachments.length >= 5) {
+        alert("You can attach up to 5 documents at a time.");
+        break;
+      }
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        const id = ++attachSeq;
+        pendingAttachments.push({ id, filename: file.name, status: "error", error: `Too large (max ${MAX_FILE_MB}MB)` });
+        renderAttachments();
+        continue;
+      }
+      const id = ++attachSeq;
+      const entry = { id, filename: file.name, status: "loading" };
+      pendingAttachments.push(entry);
+      renderAttachments();
+      updateSendState();
+
+      try {
+        const token = await accessToken();
+        const fd = new FormData();
+        fd.append("file", file);
+        const resp = await fetch("/api/extract", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        const cur = pendingAttachments.find((x) => x.id === id);
+        if (!cur) continue; // removed while loading
+        if (!resp.ok) {
+          cur.status = "error";
+          cur.error = data.error || "Couldn't read file";
+        } else {
+          cur.status = "ready";
+          cur.text = data.text;
+          cur.chars = data.chars;
+          cur.truncated = data.truncated;
+        }
+      } catch {
+        const cur = pendingAttachments.find((x) => x.id === id);
+        if (cur) { cur.status = "error"; cur.error = "Upload failed"; }
+      }
+      renderAttachments();
+      updateSendState();
+    }
+  }
+
+  function readyAttachments() {
+    return pendingAttachments.filter((a) => a.status === "ready" && a.text);
+  }
+  function attachmentsBusy() {
+    return pendingAttachments.some((a) => a.status === "loading");
+  }
+  function clearAttachments() {
+    pendingAttachments = [];
+    renderAttachments();
+  }
+
+  // ---------------- Composer ----------------
+  function updateSendState() {
+    els.send.disabled = streaming || attachmentsBusy() || (!els.input.value.trim() && readyAttachments().length === 0);
+  }
+  function autoGrow() {
+    els.input.style.height = "auto";
+    els.input.style.height = Math.min(els.input.scrollHeight, 200) + "px";
+  }
+  function closeSidebarMobile() {
+    els.sidebar.classList.remove("open");
+  }
+
+  async function startNewChat() {
+    // If current active convo is already empty, just stay.
+    const current = conversations.find((c) => c.id === activeId);
+    if (current && messages.length === 0) {
+      els.input.focus();
+      return;
+    }
+    activeId = null;
+    messages = [];
+    renderSidebar();
+    renderMessages();
+    closeSidebarMobile();
+    els.input.focus();
+  }
+
+  // ---------------- Events ----------------
   els.form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = els.input.value;
     els.input.value = "";
-    autoGrow(); updateSendState(); sendMessage(text);
+    autoGrow();
+    updateSendState();
+    sendMessage(text);
   });
   els.input.addEventListener("input", () => { autoGrow(); updateSendState(); });
   els.input.addEventListener("keydown", (e) => {
@@ -432,6 +625,13 @@
   });
   els.newChat.addEventListener("click", startNewChat);
   els.menuToggle.addEventListener("click", () => els.sidebar.classList.toggle("open"));
+
+  // Attach document
+  els.attachBtn.addEventListener("click", () => els.fileInput.click());
+  els.fileInput.addEventListener("change", (e) => {
+    handleFiles(e.target.files);
+    els.fileInput.value = ""; // allow re-selecting the same file
+  });
   els.suggestions?.addEventListener("click", (e) => {
     const btn = e.target.closest(".suggestion");
     if (btn) sendMessage(btn.dataset.q);
@@ -440,10 +640,12 @@
     if (confirm("Sign out of CARA?")) {
       await supabase.auth.signOut();
       conversations = []; messages = []; activeId = null;
+      clearAttachments();
       showAuth();
     }
   });
 
+  // ---------------- Go ----------------
   setAuthMode("signin");
   boot();
 })();

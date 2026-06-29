@@ -24,7 +24,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* The HTML hidden attribute must always win over display rules below. */
+/* The HTML `hidden` attribute must always win over display rules below
+   (e.g. .boot / .auth-screen set display:flex, which would otherwise
+   override `hidden` and trap the user on the loading screen). */
 [hidden] { display: none !important; }
 
 html, body {
@@ -410,6 +412,83 @@ html, body {
   text-align: center;
   font-size: 11.5px;
   color: var(--fg-3);
+}
+
+/* ---------- Attach button + chips ---------- */
+.attach-btn {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: var(--radius);
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--fg-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.attach-btn:hover { border-color: var(--pink); color: var(--fg); }
+
+.attachments {
+  max-width: 760px;
+  margin: 0 auto;
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+.attachments.has-items { display: flex; }
+
+.attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 260px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 8px 7px 10px;
+}
+.attach-chip.error { border-color: var(--pink-line); }
+.chip-icon { display: flex; color: var(--pink); flex-shrink: 0; }
+.attach-chip.error .chip-icon { color: var(--pink); }
+.chip-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.chip-name {
+  font-size: 12.5px;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip-meta {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attach-chip.error .chip-meta { color: var(--pink); }
+.chip-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--fg-3);
+  cursor: pointer;
+  display: flex;
+  padding: 3px;
+  border-radius: 4px;
+}
+.chip-remove:hover { color: var(--fg); background: var(--bg-2); }
+.chip-spinner {
+  width: 13px; height: 13px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
 }
 
 /* ---------- Scrollbars ---------- */
