@@ -87,6 +87,9 @@ async function getUserFromToken(token) {
   }
 }
 
+// Domain restriction — only @callstreamai.com accounts may use CARA.
+const ALLOWED_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "callstreamai.com";
+
 // ---- Helper: require a signed-in user (returns user or sends 401) -------
 async function requireUser(req, res) {
   if (!AUTH_ENABLED) return { id: "anonymous" };
@@ -95,6 +98,11 @@ async function requireUser(req, res) {
   const user = await getUserFromToken(token);
   if (!user || !user.id) {
     res.status(401).json({ error: "Please sign in first." });
+    return null;
+  }
+  const email = (user.email || "").toLowerCase();
+  if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    res.status(403).json({ error: `Access is restricted to @${ALLOWED_DOMAIN} accounts.` });
     return null;
   }
   return user;
@@ -169,14 +177,18 @@ app.post("/api/chat", async (req, res) => {
     return res.status(500).json({ error: "Server is missing SAKANA_API_KEY." });
   }
 
-  // When auth is enabled, require a valid signed-in user so the Fugu key
-  // can't be abused by anonymous callers.
+  // When auth is enabled, require a valid signed-in @callstreamai.com user so
+  // the Fugu key can't be abused by anyone outside the company.
   if (AUTH_ENABLED) {
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     const user = await getUserFromToken(token);
     if (!user || !user.id) {
       return res.status(401).json({ error: "Please sign in to chat with CARA." });
+    }
+    const email = (user.email || "").toLowerCase();
+    if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+      return res.status(403).json({ error: `Access is restricted to @${ALLOWED_DOMAIN} accounts.` });
     }
   }
 
