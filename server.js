@@ -43,6 +43,10 @@ const SYSTEM_PROMPT =
     "You speak clearly and confidently — short sentences, real nouns, no hype.",
     "State things once and move on. Be genuinely helpful and conversational.",
     "Use Markdown for structure when it helps (lists, code blocks, bold).",
+    "You can read Call Stream AI's Slack channels. When a message includes a <slack> block,",
+    "it contains real, recent messages from the company Slack — treat it as authoritative",
+    "and use it to answer questions about what was posted, summarize discussions, or find the",
+    "latest update. Cite the channel name (e.g. #client-success) when you reference something.",
   ].join(" ");
 
 if (!SAKANA_API_KEY) {
@@ -171,6 +175,123 @@ app.post("/api/extract", upload.single("file"), async (req, res) => {
   }
 });
 
+// ---- Slack integration --------------------------------------------------
+// Uses a bot token (SLACK_BOT_TOKEN) to read channel history. The bot must be
+// invited to any channel you want CARA to see, and the app needs the
+// `channels:history` + `channels:read` scopes. Message *search* is not used
+// because Slack only allows search.messages with user tokens, not bot tokens —
+// so CARA reads recent history from channels the bot is a member of instead.
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+const SLACK_ENABLED = Boolean(SLACK_BOT_TOKEN);
+
+async function slackApi(method, params = {}, httpMethod = "GET") {
+  const url = new URL(`https://slack.com/api/${method}`);
+  const opts = { headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` } };
+  if (httpMethod === "GET") {
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  } else {
+    opts.method = "POST";
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(params);
+  }
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// Cache the channel list briefly so we do not hammer Slack on every message.
+let _slackChannelCache = { at: 0, channels: [] };
+async function getSlackChannels() {
+  if (Date.now() - _slackChannelCache.at < 60000 && _slackChannelCache.channels.length) {
+    return _slackChannelCache.channels;
+  }
+  const out = [];
+  let cursor = "";
+  do {
+    const data = await slackApi("conversations.list", {
+      types: "public_channel",
+      limit: 200,
+      exclude_archived: true,
+      ...(cursor ? { cursor } : {}),
+    });
+    if (!data.ok) break;
+    out.push(...(data.channels || []));
+    cursor = data.response_metadata?.next_cursor || "";
+  } while (cursor);
+  _slackChannelCache = { at: Date.now(), channels: out };
+  return out;
+}
+
+// Resolve user IDs to display names so transcripts are readable.
+const _slackUserCache = new Map();
+async function resolveSlackUser(id) {
+  if (!id) return "someone";
+  if (_slackUserCache.has(id)) return _slackUserCache.get(id);
+  const data = await slackApi("users.info", { user: id });
+  const name = data.ok ? (data.user?.profile?.display_name || data.user?.real_name || data.user?.name || id) : id;
+  _slackUserCache.set(id, name);
+  return name;
+}
+
+// Given a free-text request, find the best-matching channels the bot can read
+// and return a formatted transcript of their recent messages.
+async function fetchSlackContext(query, maxChannels = 3, perChannel = 15) {
+  const channels = await getSlackChannels();
+  const memberChannels = channels.filter((c) => c.is_member);
+  if (!memberChannels.length) {
+    return { ok: false, reason: "no_member_channels", channels: channels.map((c) => c.name) };
+  }
+
+  // Score channels by name overlap with the query.
+  const q = (query || "").toLowerCase();
+  const scored = memberChannels
+    .map((c) => {
+      const name = c.name.toLowerCase();
+      let score = 0;
+      if (q.includes(name)) score += 10;
+      name.split(/[-_]/).forEach((tok) => { if (tok && q.includes(tok)) score += 3; });
+      return { channel: c, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  // If nothing matched by name, fall back to the highest-traffic member channels.
+  const picked = (scored.some((s) => s.score > 0) ? scored.filter((s) => s.score > 0) : scored).slice(0, maxChannels);
+
+  const blocks = [];
+  for (const { channel } of picked) {
+    const hist = await slackApi("conversations.history", { channel: channel.id, limit: perChannel });
+    if (!hist.ok || !hist.messages?.length) continue;
+    const lines = [];
+    for (const m of hist.messages.slice().reverse()) {
+      if (m.subtype && m.subtype !== "thread_broadcast") continue;
+      const who = await resolveSlackUser(m.user);
+      const when = m.ts ? new Date(Number(m.ts) * 1000).toISOString().slice(0, 16).replace("T", " ") : "";
+      const text = (m.text || "").replace(/\s+/g, " ").trim();
+      if (text) lines.push(`[${when}] ${who}: ${text}`);
+    }
+    if (lines.length) blocks.push(`#${channel.name}\n${lines.join("\n")}`);
+  }
+
+  if (!blocks.length) return { ok: false, reason: "no_messages" };
+  return { ok: true, transcript: blocks.join("\n\n"), channels: picked.map((p) => p.channel.name) };
+}
+
+// Status endpoint — lets the UI (and you) see whether Slack is wired up.
+app.get("/api/slack/status", async (req, res) => {
+  const user = await requireUser(req, res);
+  if (!user) return;
+  if (!SLACK_ENABLED) return res.json({ enabled: false });
+  const auth = await slackApi("auth.test");
+  if (!auth.ok) return res.json({ enabled: true, connected: false, error: auth.error });
+  const channels = await getSlackChannels();
+  res.json({
+    enabled: true,
+    connected: true,
+    workspace: auth.team,
+    memberChannels: channels.filter((c) => c.is_member).map((c) => c.name),
+    totalChannels: channels.length,
+  });
+});
+
 // ---- Chat (SSE streaming proxy to Sakana Fugu) --------------------------
 app.post("/api/chat", async (req, res) => {
   if (!SAKANA_API_KEY) {
@@ -227,6 +348,43 @@ app.post("/api/chat", async (req, res) => {
           role: "user",
           content: context + cleaned[lastUserIdx].content,
         };
+      }
+    }
+  }
+
+  // ---- Slack context injection ----
+  // If the user's latest message references Slack, pull recent channel history
+  // and prepend it as context (same pattern as document attachments).
+  if (SLACK_ENABLED) {
+    let lastUser = "";
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      if (cleaned[i].role === "user") { lastUser = cleaned[i].content; break; }
+    }
+    if (/\bslack\b|\bchannel\b|#[a-z0-9_-]+/i.test(lastUser)) {
+      try {
+        const slack = await fetchSlackContext(lastUser);
+        let lastUserIdx = -1;
+        for (let i = cleaned.length - 1; i >= 0; i--) {
+          if (cleaned[i].role === "user") { lastUserIdx = i; break; }
+        }
+        if (lastUserIdx !== -1) {
+          if (slack.ok) {
+            const ctx =
+              "The user is asking about Slack. Here is recent message history " +
+              `from the relevant channel(s) (${slack.channels.map((c) => "#" + c).join(", ")}). ` +
+              "Use it to answer. Messages are oldest-to-newest; the last line in each " +
+              "channel is the most recent post.\n\n<slack>\n" + slack.transcript + "\n</slack>\n\n---\n\n";
+            cleaned[lastUserIdx] = { role: "user", content: ctx + cleaned[lastUserIdx].content };
+          } else if (slack.reason === "no_member_channels") {
+            const ctx =
+              "Note: CARA is connected to Slack but has not been invited to any channels yet, " +
+              "so there is no message history to read. Tell the user to invite the CARA bot to " +
+              "the channel(s) they want searched by typing `/invite @CARA` in that Slack channel.\n\n---\n\n";
+            cleaned[lastUserIdx] = { role: "user", content: ctx + cleaned[lastUserIdx].content };
+          }
+        }
+      } catch (e) {
+        console.error("[CARA] slack context error:", e.message);
       }
     }
   }
