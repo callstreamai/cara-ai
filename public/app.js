@@ -45,7 +45,6 @@
   let activeId = null;
   let messages = [];        // messages of the active conversation
   let streaming = false;
-  let authMode = "signin";  // or "signup"
 
   // ---------------- Boot ----------------
   async function boot() {
@@ -596,6 +595,5 @@
   });
 
   // ---------------- Go ----------------
-  setAuthMode("signin");
   boot();
 })();
