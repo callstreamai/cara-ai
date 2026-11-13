@@ -170,10 +170,12 @@
     try {
       const token = await accessToken();
       const response = await fetch("/api/slack/status", { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error("Could not check search coverage.");
       const status = await response.json();
       els.slackConnect.hidden = !status.configured;
-      els.slackConnect.textContent = status.connected ? "Reconnect Slack" : "Connect Slack";
-      els.slackStatus.textContent = !status.configured ? "Slack search is not configured." : status.connected ? "Slack connected" : "Connect Slack to search company knowledge.";
+      document.querySelector("#search-coverage").textContent = status.publicConfigured ? "Public Slack channels" + (status.connected ? " + your private conversations" : " · included") : "Company search setup pending";
+      els.slackConnect.textContent = status.connected ? "Manage personal Slack" : "Connect personal Slack";
+      els.slackStatus.textContent = status.publicConfigured ? (status.connected ? "Public channels + your private conversations" : "Public channels · Personal Slack is optional") : (status.connected ? "Your Slack connected · Company search setup pending" : "Company search setup pending");
     } catch { els.slackStatus.textContent = "Could not check Slack connection."; }
   }
   els.slackConnect.addEventListener("click", async () => {
