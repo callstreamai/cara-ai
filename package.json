@@ -1,12 +1,13 @@
 {
   "name": "cara-ai",
   "version": "1.0.0",
-  "description": "CARA AI — a consumer chat assistant powered by Sakana Fugu, by Call Stream AI.",
+  "description": "CARA AI \u2014 a consumer chat assistant powered by Google Gemini, by Call Stream AI.",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test slack-auth.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
