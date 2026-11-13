@@ -11,7 +11,8 @@
   --line-2: #2a2a2a;
   --fg: #f5f5f5;
   --fg-2: #a0a0a0;
-  --fg-3: #808080;
+  --fg-3: #929292;
+  --error: #e0556b;
   --pink: #d560b2;
   --pink-dim: rgba(213, 96, 178, 0.1);
   --pink-line: #3a1f33;
@@ -41,7 +42,7 @@ html, body {
 
 #app {
   display: grid;
-  grid-template-columns: 268px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr);
   height: 100dvh;
 }
 
@@ -162,7 +163,7 @@ html, body {
 .status .dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(0, 186, 124, 0.12);
+
 }
 .byline {
   font-family: var(--mono);
@@ -327,7 +328,7 @@ html, body {
 }
 .welcome-mark { width: 44px; height: 44px; margin-bottom: 24px; }
 .welcome-title {
-  font-size: 38px;
+  font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.05;
@@ -526,7 +527,6 @@ html, body {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(900px 500px at 50% -10%, rgba(213, 96, 178, 0.07), transparent 60%),
     var(--bg);
   padding: 24px;
   z-index: 90;
@@ -633,7 +633,7 @@ html, body {
 .auth-domain-note {
   margin-top: 10px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--fg-2);
   text-align: center;
 }
 
@@ -719,4 +719,103 @@ html, body {
   .suggestions { grid-template-columns: 1fr; }
   .welcome-title { font-size: 30px; }
   #backdrop.show { display: block; }
+}
+
+/* Employee workspace accessibility and mobile layout. */
+button, input, textarea, select { font-family: var(--sans); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--pink); outline-offset: 3px;
+}
+.composer-inner { border-color: #575757; }
+.composer-inner:focus-within { border-color: var(--pink); }
+#input { min-width: 0; }
+#slack-status { color: var(--fg-2); font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.btn-new, .user-menu, .suggestion { min-height: 44px; }
+.send-btn, .attach-btn, .icon-btn { min-width: 44px; min-height: 44px; }
+.convo-item { min-height: 44px; }
+.convo-item.active { background: var(--pink-dim); }
+.convo-item .title { text-align: left; background: none; border: none; color: inherit; font: inherit; min-width: 0; min-height: 40px; cursor: pointer; }
+.convo-item .del { min-width: 32px; min-height: 40px; align-items: center; justify-content: center; }
+.convo-item:focus-within .del { opacity: 1; }
+.auth-error, .attach-chip.error { border-color: var(--error); }
+.auth-error { background: rgba(224,85,107,.08); }
+.attach-chip.error .chip-icon, .attach-chip.error .chip-meta { color: var(--error); }
+.auth-screen { overflow-y: auto; }
+.auth-card { flex-shrink: 0; }
+.msg-content { overflow-wrap: anywhere; }
+.msg-content table { display: block; overflow-x: auto; max-width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (max-width: 820px) {
+  #sidebar { max-width: calc(100vw - 44px); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  #topbar { padding: max(8px, env(safe-area-inset-top)) 12px 8px; }
+  #composer { padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .composer-inner { gap: 8px; padding: 8px; }
+  #input, .field input { font-size: 16px; }
+  .welcome { padding: 32px 20px 24px; }
+  .welcome-title { font-size: 28px; }
+  .suggestions { margin-top: 24px; }
+  .msg { padding: 20px 16px; gap: 12px; }
+  .convo-item .del { opacity: 1; }
+  #sidebar:not(.open) { visibility: hidden; }
+}
+@media (max-height: 520px) { .auth-screen { justify-content: flex-start; } }
+
+/* Official assets from the Call Stream brand guide; preserve their artwork. */
+.brand { flex-wrap: wrap; }
+.brand-mark { width: 144px; height: auto; object-fit: contain; }
+.brand-word { font-size: 14px; color: var(--fg-2); }
+.auth-mark, .welcome-mark { object-fit: contain; }
+.avatar.cara img { width: 24px; height: 24px; object-fit: contain; }
+
+/* Refined internal workspace: compact navigation, calm conversation rail. */
+#app { grid-template-columns: 272px minmax(0, 1fr); }
+#sidebar { background: #080808; }
+.sidebar-head { padding: 24px 16px 12px; }
+.brand { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
+.brand-mark { width: 184px; height: auto; }
+.brand-word { display: flex; align-items: center; gap: 12px; font-size: 18px; color: var(--fg); }
+.brand-caption { font-size: 12px; font-weight: 400; color: var(--fg-2); }
+.btn-new { justify-content: flex-start; padding: 12px; }
+.convo-label, .connection-label { font: 11px var(--mono); letter-spacing: .1em; color: var(--fg-3); }
+.convo-label { padding: 16px 20px 12px; }
+.convo-item { padding: 0 10px; gap: 8px; min-height: 44px; margin-bottom: 4px; }
+.convo-item .title { flex: 1 1 0; font-size: 13px; }
+.convo-item .del { width: 24px; min-width: 24px; flex-shrink: 0; }
+.sidebar-foot { padding: 16px 12px; }
+.connection-label { margin: 0 8px 12px; }
+#slack-connect { border-color: transparent; background: transparent; color: var(--fg-2); font-size: 13px; }
+#slack-connect:hover { background: var(--card); border-color: var(--line-2); }
+#slack-status { margin: 4px 10px 12px; font-size: 12px; }
+.user-menu { border-top: 1px solid var(--line); border-radius: 0; padding-top: 14px; }
+#topbar { min-height: 64px; padding: 12px 28px; }
+.model-pill { letter-spacing: .04em; font-size: 11px; padding: 6px 10px; }
+.model-pill .pill-dot { background: var(--fg-3); }
+.msg-row.assistant { background: transparent; }
+.msg { max-width: 880px; padding: 28px 32px; gap: 16px; }
+.msg-row.user .msg-body { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+.msg-role { font-size: 11px; letter-spacing: .08em; margin-bottom: 8px; }
+.msg-content { font-size: 16px; line-height: 1.75; }
+.avatar { margin-top: 4px; }
+.welcome { max-width: 800px; padding-top: clamp(40px, 12vh, 120px); }
+.welcome-mark { width: 56px; height: 56px; margin-bottom: 20px; }
+.welcome-sub { line-height: 1.6; max-width: 480px; margin: 12px auto 0; }
+.suggestions { margin-top: 32px; gap: 12px; }
+.suggestion { min-height: 64px; padding: 18px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+#composer { border-top: 0; padding: 16px 28px 20px; }
+.search-coverage { max-width: 816px; margin: 0 auto 10px; font-size: 12px; color: var(--fg-2); }
+.composer-inner { max-width: 816px; padding: 12px; border-color: #575757; }
+.composer-foot { margin-top: 12px; }
+@media (max-width: 820px) {
+  #app { grid-template-columns: minmax(0, 1fr); }
+  #topbar { padding: max(8px, env(safe-area-inset-top)) 12px 8px; }
+  #composer { padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .composer-inner { padding: 8px; }
+  .msg { padding: 20px 16px; gap: 10px; }
+  .msg-content { font-size: 15px; }
+  .msg-row.user .msg-body { padding: 12px; }
+  .welcome { padding: 28px 20px; }
+  .suggestion { min-height: 52px; padding: 14px 16px; }
+  .search-coverage { font-size: 11px; }
 }

@@ -8,15 +8,25 @@ services:
     startCommand: npm start
     autoDeploy: true
     envVars:
-      - key: SAKANA_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
-      - key: SAKANA_MODEL
-        value: fugu
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SLACK_PUBLIC_SEARCH_TOKEN
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_WORKSPACE_ID
+        sync: false
+      - key: SLACK_REDIRECT_URI
+        sync: false
+      - key: SLACK_SESSION_SECRET
         sync: false
       - key: NODE_VERSION
         value: 20.11.1

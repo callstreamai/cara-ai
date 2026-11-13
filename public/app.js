@@ -1,7 +1,7 @@
 // CARA AI — frontend
 // Real user accounts via Supabase Auth. Conversations + messages are stored
 // per-user in Supabase (protected by row-level security). Live SSE streaming
-// from the server-side Fugu proxy.
+// from the server-side Gemini proxy.
 
 (() => {
   if (window.marked) marked.setOptions({ breaks: true, gfm: true });
@@ -34,6 +34,8 @@
     attachBtn: $("#attach-btn"),
     fileInput: $("#file-input"),
     attachments: $("#attachments"),
+    slackConnect: $("#slack-connect"),
+    slackStatus: $("#slack-status"),
   };
 
   // Attached documents staged for the next message: {id, filename, text, chars, truncated, status}
@@ -155,6 +157,7 @@
     els.userAvatar.textContent = (email[0] || "U").toUpperCase();
 
     await loadConversations();
+    await refreshSlackStatus();
     els.input.focus();
   }
 
@@ -162,6 +165,28 @@
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token || "";
   }
+
+  async function refreshSlackStatus() {
+    try {
+      const token = await accessToken();
+      const response = await fetch("/api/slack/status", { headers: { Authorization: `Bearer ${token}` } });
+      if (!response.ok) throw new Error("Could not check search coverage.");
+      const status = await response.json();
+      els.slackConnect.hidden = !status.configured;
+      document.querySelector("#search-coverage").textContent = status.publicConfigured ? "Public Slack channels" + (status.connected ? " + your private conversations" : " · included") : "Company search setup pending";
+      els.slackConnect.textContent = status.connected ? "Manage personal Slack" : "Connect personal Slack";
+      els.slackStatus.textContent = status.publicConfigured ? (status.connected ? "Public channels + your private conversations" : "Public channels · Personal Slack is optional") : (status.connected ? "Your Slack connected · Company search setup pending" : "Company search setup pending");
+    } catch { els.slackStatus.textContent = "Could not check Slack connection."; }
+  }
+  els.slackConnect.addEventListener("click", async () => {
+    try {
+      const token = await accessToken();
+      const response = await fetch("/api/slack/connect", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to connect Slack.");
+      window.location.assign(data.url);
+    } catch (e) { els.slackStatus.textContent = e.message; }
+  });
 
   // ---------------- Data: conversations ----------------
   async function loadConversations() {
@@ -252,7 +277,7 @@
       item.className = "convo-item" + (c.id === activeId ? " active" : "");
       item.innerHTML = `
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span class="title">${escapeHtml(c.title)}</span>
+        <button class="title" type="button" ${c.id === activeId ? 'aria-current="page"' : ""}>${escapeHtml(c.title)}</button>
         <button class="del" title="Delete" aria-label="Delete conversation">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
         </button>`;
@@ -285,7 +310,7 @@
     const isUser = role === "user";
     const avatar = isUser
       ? `<div class="avatar user">${(user?.email?.[0] || "Y").toUpperCase()}</div>`
-      : `<div class="avatar cara"><svg viewBox="0 0 64 64"><circle cx="22" cy="32" r="5" fill="#D560B2"></circle><path d="M34 20 A18 18 0 0 1 34 44" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round"></path><path d="M42 22 A14 14 0 0 1 42 42" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.7"></path><path d="M50 25 A10 10 0 0 1 50 39" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.44"></path></svg></div>`;
+      : `<div class="avatar cara"><img src="https://style.callstreamai.com/mark-on-black.png" alt="" /></div>`;
     row.innerHTML = `
       <div class="msg">
         ${avatar}
@@ -299,7 +324,7 @@
   }
 
   function renderMarkdown(text) {
-    return window.marked ? marked.parse(text) : escapeHtml(text);
+    return window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(text)) : escapeHtml(text);
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -361,6 +386,7 @@
 
     let acc = "";
     let firstToken = true;
+    let streamError = "";
 
     try {
       const token = await accessToken();
@@ -410,12 +436,13 @@
             contentEl.innerHTML = renderMarkdown(acc) + `<span class="cursor"></span>`;
             scrollToBottom();
           } else if (event === "error") {
-            contentEl.innerHTML = renderMarkdown(`⚠️ ${parsed.error || "Upstream error."}`);
+            streamError = parsed.error || "Upstream error.";
+            contentEl.innerHTML = renderMarkdown(`⚠️ ${streamError}`);
           }
         }
       }
 
-      contentEl.innerHTML = renderMarkdown(acc || "(no response)");
+      contentEl.innerHTML = renderMarkdown(acc || (streamError ? `⚠️ ${streamError}` : "(no response)"));
       if (acc) {
         messages.push({ role: "assistant", content: acc });
         await addMessage(convo.id, "assistant", acc);
@@ -542,6 +569,7 @@
   }
   function closeSidebarMobile() {
     els.sidebar.classList.remove("open");
+    els.menuToggle.setAttribute("aria-expanded", "false");
   }
 
   async function startNewChat() {
@@ -573,7 +601,15 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); els.form.requestSubmit(); }
   });
   els.newChat.addEventListener("click", startNewChat);
-  els.menuToggle.addEventListener("click", () => els.sidebar.classList.toggle("open"));
+  els.menuToggle.addEventListener("click", () => {
+    const open = els.sidebar.classList.toggle("open");
+    els.menuToggle.setAttribute("aria-expanded", String(open));
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.sidebar.classList.contains("open")) {
+      closeSidebarMobile(); els.menuToggle.focus();
+    }
+  });
 
   // Attach document
   els.attachBtn.addEventListener("click", () => els.fileInput.click());
@@ -587,6 +623,8 @@
   });
   els.userMenu.addEventListener("click", async () => {
     if (confirm("Sign out of CARA?")) {
+      const token = await accessToken();
+      await fetch("/api/slack/disconnect", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
       await supabase.auth.signOut();
       conversations = []; messages = []; activeId = null;
       clearAttachments();
