@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test slack-auth.test.js"
+    "test": "node --test slack-auth.test.js company-context.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
