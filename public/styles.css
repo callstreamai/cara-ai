@@ -761,3 +761,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   #sidebar:not(.open) { visibility: hidden; }
 }
 @media (max-height: 520px) { .auth-screen { justify-content: flex-start; } }
+
+/* Official assets from the Call Stream brand guide; preserve their artwork. */
+.brand { flex-wrap: wrap; }
+.brand-mark { width: 144px; height: auto; object-fit: contain; }
+.brand-word { font-size: 14px; color: var(--fg-2); }
+.auth-mark, .welcome-mark { object-fit: contain; }
+.avatar.cara img { width: 24px; height: 24px; object-fit: contain; }
