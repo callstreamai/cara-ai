@@ -19,3 +19,8 @@ test('comparison retrieves both company contexts independently',()=>{
 test('new ambiguous conversation has no default company',()=>{
  assert.deepEqual(companyContext([user('How is billing going?')]),{companies:[],origin:'unspecified',queries:['How is billing going?']});
 });
+
+test('ADAI Fireflies summaries belong to Alpha Drive context',()=>{
+ assert.deepEqual(companyMentions('Fireflies: ADAI weekly meeting'),['Alpha Drive AI']);
+ assert.deepEqual(companyContext([user('ADAI sales'),user('What did Fireflies say?')]).companies,['Alpha Drive AI']);
+});
