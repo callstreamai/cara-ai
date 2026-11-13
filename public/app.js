@@ -308,7 +308,7 @@
     const isUser = role === "user";
     const avatar = isUser
       ? `<div class="avatar user">${(user?.email?.[0] || "Y").toUpperCase()}</div>`
-      : `<div class="avatar cara"><svg viewBox="0 0 64 64"><circle cx="22" cy="32" r="5" fill="#D560B2"></circle><path d="M34 20 A18 18 0 0 1 34 44" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round"></path><path d="M42 22 A14 14 0 0 1 42 42" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.7"></path><path d="M50 25 A10 10 0 0 1 50 39" stroke="#F5F5F5" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.44"></path></svg></div>`;
+      : `<div class="avatar cara"><img src="https://style.callstreamai.com/mark-on-black.png" alt="" /></div>`;
     row.innerHTML = `
       <div class="msg">
         ${avatar}
