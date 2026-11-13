@@ -62,3 +62,12 @@ Slack search and identity verification must be configured before chat will opera
 ## Validation
 
 Run `npm test` for cookie encryption, expiry, tampering and PKCE checks. End-to-end Slack OAuth, search permissions, model generation, and deployment require a configured test app and credentials.
+
+
+## Company-wide public knowledge and optional personal Slack
+
+Set `SLACK_PUBLIC_SEARCH_TOKEN` on the server using a workspace-approved user connection restricted to `search:read.public`. Do not reuse a founder's private-message credential. The workspace ID must match `SLACK_WORKSPACE_ID`; CARA checks it before public retrieval. All authenticated company employees can query public channels with this connection, without personal Slack OAuth. Slack imposes per-user rate limits on this central connection, so validate capacity before broad rollout.
+
+Public searches use a hard-coded `public_channel` filter. The API request cannot expand that filter. A separate, optional employee OAuth connection adds private channels and DMs using `search:read.private`, `search:read.im`, and `search:read.mpim`, alongside identity/email scopes. These scopes must be configured and consented in Slack before the optional connection works. Employee tokens remain encrypted and bound to that employee's CARA session. Disconnecting an employee never removes the public connection.
+
+Configuration is not proof of search health: until a real public query passes, the shared connection is not validated. Missing public configuration is shown as administrator setup pending, not as connected.
