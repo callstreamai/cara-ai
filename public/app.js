@@ -1,7 +1,7 @@
 // CARA AI — frontend
 // Real user accounts via Supabase Auth. Conversations + messages are stored
 // per-user in Supabase (protected by row-level security). Live SSE streaming
-// from the server-side Fugu proxy.
+// from the server-side Gemini proxy.
 
 (() => {
   if (window.marked) marked.setOptions({ breaks: true, gfm: true });
@@ -34,6 +34,8 @@
     attachBtn: $("#attach-btn"),
     fileInput: $("#file-input"),
     attachments: $("#attachments"),
+    slackConnect: $("#slack-connect"),
+    slackStatus: $("#slack-status"),
   };
 
   // Attached documents staged for the next message: {id, filename, text, chars, truncated, status}
@@ -155,6 +157,7 @@
     els.userAvatar.textContent = (email[0] || "U").toUpperCase();
 
     await loadConversations();
+    await refreshSlackStatus();
     els.input.focus();
   }
 
@@ -162,6 +165,26 @@
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token || "";
   }
+
+  async function refreshSlackStatus() {
+    try {
+      const token = await accessToken();
+      const response = await fetch("/api/slack/status", { headers: { Authorization: `Bearer ${token}` } });
+      const status = await response.json();
+      els.slackConnect.hidden = !status.configured;
+      els.slackConnect.textContent = status.connected ? "Reconnect Slack" : "Connect Slack";
+      els.slackStatus.textContent = !status.configured ? "Slack search is not configured." : status.connected ? "Slack connected" : "Connect Slack to search company knowledge.";
+    } catch { els.slackStatus.textContent = "Could not check Slack connection."; }
+  }
+  els.slackConnect.addEventListener("click", async () => {
+    try {
+      const token = await accessToken();
+      const response = await fetch("/api/slack/connect", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to connect Slack.");
+      window.location.assign(data.url);
+    } catch (e) { els.slackStatus.textContent = e.message; }
+  });
 
   // ---------------- Data: conversations ----------------
   async function loadConversations() {
@@ -299,7 +322,7 @@
   }
 
   function renderMarkdown(text) {
-    return window.marked ? marked.parse(text) : escapeHtml(text);
+    return window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(text)) : escapeHtml(text);
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -361,6 +384,7 @@
 
     let acc = "";
     let firstToken = true;
+    let streamError = "";
 
     try {
       const token = await accessToken();
@@ -410,12 +434,13 @@
             contentEl.innerHTML = renderMarkdown(acc) + `<span class="cursor"></span>`;
             scrollToBottom();
           } else if (event === "error") {
-            contentEl.innerHTML = renderMarkdown(`⚠️ ${parsed.error || "Upstream error."}`);
+            streamError = parsed.error || "Upstream error.";
+            contentEl.innerHTML = renderMarkdown(`⚠️ ${streamError}`);
           }
         }
       }
 
-      contentEl.innerHTML = renderMarkdown(acc || "(no response)");
+      contentEl.innerHTML = renderMarkdown(acc || (streamError ? `⚠️ ${streamError}` : "(no response)"));
       if (acc) {
         messages.push({ role: "assistant", content: acc });
         await addMessage(convo.id, "assistant", acc);
@@ -587,6 +612,8 @@
   });
   els.userMenu.addEventListener("click", async () => {
     if (confirm("Sign out of CARA?")) {
+      const token = await accessToken();
+      await fetch("/api/slack/disconnect", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
       await supabase.auth.signOut();
       conversations = []; messages = []; activeId = null;
       clearAttachments();
