@@ -18,6 +18,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: SLACK_PUBLIC_SEARCH_TOKEN
+        sync: false
       - key: SLACK_CLIENT_ID
         sync: false
       - key: SLACK_WORKSPACE_ID
