@@ -324,7 +324,20 @@
   }
 
   function renderMarkdown(text) {
-    return window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(text)) : escapeHtml(text);
+    if (!window.marked || !window.DOMPurify) return escapeHtml(text);
+    const template = document.createElement("template");
+    template.innerHTML = DOMPurify.sanitize(marked.parse(text));
+    template.content.querySelectorAll("a[href]").forEach((link) => {
+      try {
+        const url = new URL(link.getAttribute("href"));
+        if (url.protocol === "https:" && url.hostname.endsWith(".slack.com") && url.pathname.startsWith("/archives/")) {
+          link.classList.add("slack-source");
+          if (/^https?:\/\//i.test(link.textContent.trim())) link.textContent = "View Slack message";
+          link.title = "Open original Slack message";
+        }
+      } catch { /* Keep ordinary relative links unchanged. */ }
+    });
+    return template.innerHTML;
   }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
