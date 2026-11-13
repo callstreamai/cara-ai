@@ -275,7 +275,7 @@
       item.className = "convo-item" + (c.id === activeId ? " active" : "");
       item.innerHTML = `
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span class="title">${escapeHtml(c.title)}</span>
+        <button class="title" type="button" ${c.id === activeId ? 'aria-current="page"' : ""}>${escapeHtml(c.title)}</button>
         <button class="del" title="Delete" aria-label="Delete conversation">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
         </button>`;
@@ -567,6 +567,7 @@
   }
   function closeSidebarMobile() {
     els.sidebar.classList.remove("open");
+    els.menuToggle.setAttribute("aria-expanded", "false");
   }
 
   async function startNewChat() {
@@ -598,7 +599,15 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); els.form.requestSubmit(); }
   });
   els.newChat.addEventListener("click", startNewChat);
-  els.menuToggle.addEventListener("click", () => els.sidebar.classList.toggle("open"));
+  els.menuToggle.addEventListener("click", () => {
+    const open = els.sidebar.classList.toggle("open");
+    els.menuToggle.setAttribute("aria-expanded", String(open));
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && els.sidebar.classList.contains("open")) {
+      closeSidebarMobile(); els.menuToggle.focus();
+    }
+  });
 
   // Attach document
   els.attachBtn.addEventListener("click", () => els.fileInput.click());
