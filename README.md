@@ -71,3 +71,7 @@ Set `SLACK_PUBLIC_SEARCH_TOKEN` on the server using a workspace-approved user co
 Public searches use a hard-coded `public_channel` filter. The API request cannot expand that filter. A separate, optional employee OAuth connection adds private channels and DMs using `search:read.private`, `search:read.im`, and `search:read.mpim`, alongside identity/email scopes. These scopes must be configured and consented in Slack before the optional connection works. Employee tokens remain encrypted and bound to that employee's CARA session. Disconnecting an employee never removes the public connection.
 
 Configuration is not proof of search health: until a real public query passes, the shared connection is not validated. Missing public configuration is shown as administrator setup pending, not as connected.
+
+## Shared Linear ticket context
+
+Set `LINEAR_API_KEY` to a read-only key restricted to teams whose tickets all CARA employees may access. CARA searches matching tickets for each question and sends relevant issue details to Gemini along with Slack context. Search is bounded and may not find every relevant ticket. If configured Linear search fails, chat reports an error rather than implying complete coverage. Ticket data is untrusted source material, and answers should cite issue links and update dates.
